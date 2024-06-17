@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Threading;
+using System.Globalization;
 
 namespace PIG2FBX
 {
@@ -10,7 +12,7 @@ namespace PIG2FBX
     {
         static void Main(string[] args)
         {
-            System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("en-US");
+            Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
 
             string input = "";
             int totalConverted = 0;
@@ -31,7 +33,7 @@ namespace PIG2FBX
             if (File.Exists(input))
             {
                 input = Path.GetFullPath(input);
-                ConvertPIG(input);
+                ConvertPigToFbx(input);
                 Console.WriteLine("Finished converting " + Path.GetFileName(input));
             }
             else if (Directory.Exists(input))
@@ -39,7 +41,7 @@ namespace PIG2FBX
                 string[] inputFiles = Directory.GetFiles(input, "*.pig");
                 foreach (var inputFile in inputFiles)
                 {
-                    totalConverted += ConvertPIG(inputFile);
+                    totalConverted += ConvertPigToFbx(inputFile);
                 }
                 Console.WriteLine("Finished converting {0} files.", totalConverted);
                 Console.WriteLine("Press any key to exit...");
@@ -48,19 +50,24 @@ namespace PIG2FBX
             else { Console.WriteLine("Invalid input file/folder: " + input); }
         }
 
-        private static int ConvertPIG(string PIGfile)
+        private static int ConvertPigToFbx(string pigFile)
         {
             int converted = 0;
-            string output = Path.GetDirectoryName(PIGfile) + "\\" + Path.GetFileNameWithoutExtension(PIGfile) + ".fbx";
+            string output = Path.GetDirectoryName(pigFile) + "\\" + Path.GetFileNameWithoutExtension(pigFile) + ".fbx";
 
-            if (File.Exists(output))
+            for (int index = 0; File.Exists(output); ++index)
             {
-                Console.WriteLine("File already exists: " + Path.GetFileNameWithoutExtension(PIGfile) + ".fbx");
+                output += index;
+                if (index > 10)
+                {
+                    Console.WriteLine("File already exists: " + Path.GetFileNameWithoutExtension(pigFile) + ".fbx");
+                    return 0;
+                }
             }
-            else
+            
             {
-                Console.WriteLine("Converting " + Path.GetFileName(PIGfile));
-                var pmodel = new PigModel(PIGfile);
+                Console.WriteLine("Converting " + Path.GetFileName(pigFile));
+                var pig = new PigReader(pigFile);
                 var timestamp = DateTime.Now;
 
                 using (TextWriter sw = new StreamWriter(output))
@@ -75,7 +82,7 @@ namespace PIG2FBX
                     sb.Append("\n\t\tMinute: " + timestamp.Minute);
                     sb.Append("\n\t\tSecond: " + timestamp.Second);
                     sb.Append("\n\t\tMillisecond: " + timestamp.Millisecond);
-                    sb.Append("\n\t}\n\tCreator: \"PIG2FBX by Chipicao\"\n}\n");
+                    sb.Append("\n\t}\n\tCreator: \"PIG2FBX by Chipicao and Lasse Lauwerys\"\n}\n");
 
                     sb.Append("\nGlobalSettings:  {");
                     sb.Append("\n\tVersion: 1000");
@@ -121,23 +128,23 @@ namespace PIG2FBX
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Model\" {");
-                    sb.Append("\n\t\tCount: " + (pmodel.nodes.Count + pmodel.geometryCount));
+                    sb.Append("\n\t\tCount: " + (pig.nodes.Count + pig.geometryCount));
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Geometry\" {");
-                    sb.Append("\n\t\tCount: " + pmodel.geometryCount);
+                    sb.Append("\n\t\tCount: " + pig.geometryCount);
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Material\" {");
-                    sb.Append("\n\t\tCount: " + pmodel.materials.Count);
+                    sb.Append("\n\t\tCount: " + pig.materials.Count);
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Texture\" {");
-                    sb.Append("\n\t\tCount: " + pmodel.textures.Count);
+                    sb.Append("\n\t\tCount: " + pig.textures.Count);
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Video\" {");
-                    sb.Append("\n\t\tCount: " + pmodel.textures.Count);
+                    sb.Append("\n\t\tCount: " + pig.textures.Count);
                     sb.Append("\n\t}");
                     sb.Append("\n}\n");
 
@@ -148,15 +155,15 @@ namespace PIG2FBX
                     cb.Append("\n}\n");//Objects end
                     cb.Append("\nConnections:  {");
 
-                    for (int i = 0; i < pmodel.nodes.Count; i++)
+                    for (int i = 0; i < pig.nodes.Count; i++)
                     {
                         //sb.Length = 0;
-                        var pnode = pmodel.nodes[i];
+                        var pnode = pig.nodes[i];
                         var EulerRotation = ToEulerAngles(pnode.rotation);
                         int nodeID = 10000 + i; //unique number used for connections
 
                         cb.Append("\n\tC: \"OO\"," + nodeID + ","); //connect model to parent
-                        if (pnode.parentID >= 0 && pmodel.nodes[pnode.parentID] != null)
+                        if (pnode.parentID >= 0 && pig.nodes[pnode.parentID] != null)
                         {
                             int parentID = 10000 + pnode.parentID;
                             cb.Append(parentID.ToString());
@@ -182,17 +189,17 @@ namespace PIG2FBX
                     }
                     //sw.Write(sb.ToString());
 
-                    for (int i = 0; i < pmodel.objects.Count; i++)
+                    for (int i = 0; i < pig.objects.Count; i++)
                     {
-                        var pobject = pmodel.objects[i];
-                        var parentNode = pmodel.nodes[pobject.nodeID];
+                        var pobject = pig.objects[i];
+                        var parentNode = pig.nodes[pobject.nodeID];
 
-                        for (int j = 0; j < pobject.meshList.Count; j++)
+                        for (int j = 0; j < pobject.meshes.Count; j++)
                         {
                             StringBuilder vb = new StringBuilder();
 
                             //sb.Length = 0;
-                            var pmesh = pobject.meshList[j];
+                            var pmesh = pobject.meshes[j];
                             string m_Name = parentNode.name + "_" + pmesh.materialName + "_LOD" + pmesh.LODnum.ToString();
                             int meshID = 20000 + i * 100 + j; //unique number used for connections
                             int geomID = 30000 + i * 100 + j; //unique number used for connections
@@ -386,7 +393,7 @@ namespace PIG2FBX
                             //sb.Append("\n\t\t\tP: \"Lcl Rotation\", \"Lcl Rotation\", \"\", \"A\"," + EulerRotation[0] + "," + EulerRotation[1] + "," + EulerRotation[2]);
                             sb.Append("\n\t\t\tP: \"Lcl Scaling\", \"Lcl Scaling\", \"\", \"A\"," + pmesh.scale[0] + "," + pmesh.scale[1] + "," + pmesh.scale[2]);
                             //sb.Append("\n\t\t\tP: \"UDP3DSMAX\", \"KString\", \"\", \"U\", \"MapChannel:1 = UVChannel_1&cr;&lf;MapChannel:2 = UVChannel_2&cr;&lf;\"");
-                            sb.Append("\n\t\t\tP: \"MaxHandle\", \"int\", \"Integer\", \"UH\"," + (j + 2 + pmodel.nodes.Count));
+                            sb.Append("\n\t\t\tP: \"MaxHandle\", \"int\", \"Integer\", \"UH\"," + (j + 2 + pig.nodes.Count));
                             sb.Append("\n\t\t}");
                             sb.Append("\n\t\tShading: T");
                             sb.Append("\n\t\tCulling: \"CullingOff\"");
@@ -397,9 +404,9 @@ namespace PIG2FBX
                     }
 
                     //sb.Length = 0;
-                    for (int i = 0; i < pmodel.materials.Count; i++)
+                    for (int i = 0; i < pig.materials.Count; i++)
                     {
-                        var pmat = pmodel.materials[i];
+                        var pmat = pig.materials[i];
 
                         sb.Append("\n\tMaterial: " + (40000 + i) + ", \"Material::" + pmat.name + "\", \"\" {");
                         sb.Append("\n\t\tVersion: 102");
@@ -424,10 +431,10 @@ namespace PIG2FBX
                         }
                     }
 
-                    for (int i = 0; i < pmodel.textures.Count; i++)
+                    for (int i = 0; i < pig.textures.Count; i++)
                     {
-                        var texture = pmodel.textures[i];
-                        var relativeFname = MakeRelative(texture.filename, PIGfile);
+                        var texture = pig.textures[i];
+                        var relativeFname = MakeRelative(texture.filename, pigFile);
 
                         sb.Append("\n\tTexture: " + (50000 + i) + ", \"Texture::" + texture.name + "\", \"\" {");
                         sb.Append("\n\t\tType: \"TextureVideoClip\"");
