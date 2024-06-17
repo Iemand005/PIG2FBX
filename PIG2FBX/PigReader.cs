@@ -444,6 +444,8 @@ namespace PIG2FBX
 
                             newmesh.indices = new ushort[indexCount];
 
+                            File.WriteAllBytes("test", geobuffer);
+
                             using (BinaryReader geostream = new BinaryReader(new MemoryStream(geobuffer)))
                             {
                                 geostream.BaseStream.Position = 0; //is this needed? No, I believe not.
