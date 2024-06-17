@@ -60,7 +60,7 @@ namespace PIG2FBX
             else
             {
                 Console.WriteLine("Converting " + Path.GetFileName(PIGfile));
-                var pmodel = new PIGmodel(PIGfile);
+                var pmodel = new PigModel(PIGfile);
                 var timestamp = DateTime.Now;
 
                 using (TextWriter sw = new StreamWriter(output))
@@ -121,23 +121,23 @@ namespace PIG2FBX
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Model\" {");
-                    sb.Append("\n\t\tCount: " + (pmodel.nodeList.Count + pmodel.geomCount));
+                    sb.Append("\n\t\tCount: " + (pmodel.nodes.Count + pmodel.geometryCount));
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Geometry\" {");
-                    sb.Append("\n\t\tCount: " + pmodel.geomCount);
+                    sb.Append("\n\t\tCount: " + pmodel.geometryCount);
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Material\" {");
-                    sb.Append("\n\t\tCount: " + pmodel.matList.Count);
+                    sb.Append("\n\t\tCount: " + pmodel.materials.Count);
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Texture\" {");
-                    sb.Append("\n\t\tCount: " + pmodel.texList.Count);
+                    sb.Append("\n\t\tCount: " + pmodel.textures.Count);
                     sb.Append("\n\t}");
 
                     sb.Append("\n\tObjectType: \"Video\" {");
-                    sb.Append("\n\t\tCount: " + pmodel.texList.Count);
+                    sb.Append("\n\t\tCount: " + pmodel.textures.Count);
                     sb.Append("\n\t}");
                     sb.Append("\n}\n");
 
@@ -148,15 +148,15 @@ namespace PIG2FBX
                     cb.Append("\n}\n");//Objects end
                     cb.Append("\nConnections:  {");
 
-                    for (int i = 0; i < pmodel.nodeList.Count; i++)
+                    for (int i = 0; i < pmodel.nodes.Count; i++)
                     {
                         //sb.Length = 0;
-                        var pnode = pmodel.nodeList[i];
+                        var pnode = pmodel.nodes[i];
                         var EulerRotation = ToEulerAngles(pnode.rotation);
                         int nodeID = 10000 + i; //unique number used for connections
 
                         cb.Append("\n\tC: \"OO\"," + nodeID + ","); //connect model to parent
-                        if (pnode.parentID >= 0 && pmodel.nodeList[pnode.parentID] != null)
+                        if (pnode.parentID >= 0 && pmodel.nodes[pnode.parentID] != null)
                         {
                             int parentID = 10000 + pnode.parentID;
                             cb.Append(parentID.ToString());
@@ -182,10 +182,10 @@ namespace PIG2FBX
                     }
                     //sw.Write(sb.ToString());
 
-                    for (int i = 0; i < pmodel.objectList.Count; i++)
+                    for (int i = 0; i < pmodel.objects.Count; i++)
                     {
-                        var pobject = pmodel.objectList[i];
-                        var parentNode = pmodel.nodeList[pobject.nodeID];
+                        var pobject = pmodel.objects[i];
+                        var parentNode = pmodel.nodes[pobject.nodeID];
 
                         for (int j = 0; j < pobject.meshList.Count; j++)
                         {
@@ -386,7 +386,7 @@ namespace PIG2FBX
                             //sb.Append("\n\t\t\tP: \"Lcl Rotation\", \"Lcl Rotation\", \"\", \"A\"," + EulerRotation[0] + "," + EulerRotation[1] + "," + EulerRotation[2]);
                             sb.Append("\n\t\t\tP: \"Lcl Scaling\", \"Lcl Scaling\", \"\", \"A\"," + pmesh.scale[0] + "," + pmesh.scale[1] + "," + pmesh.scale[2]);
                             //sb.Append("\n\t\t\tP: \"UDP3DSMAX\", \"KString\", \"\", \"U\", \"MapChannel:1 = UVChannel_1&cr;&lf;MapChannel:2 = UVChannel_2&cr;&lf;\"");
-                            sb.Append("\n\t\t\tP: \"MaxHandle\", \"int\", \"Integer\", \"UH\"," + (j + 2 + pmodel.nodeList.Count));
+                            sb.Append("\n\t\t\tP: \"MaxHandle\", \"int\", \"Integer\", \"UH\"," + (j + 2 + pmodel.nodes.Count));
                             sb.Append("\n\t\t}");
                             sb.Append("\n\t\tShading: T");
                             sb.Append("\n\t\tCulling: \"CullingOff\"");
@@ -397,9 +397,9 @@ namespace PIG2FBX
                     }
 
                     //sb.Length = 0;
-                    for (int i = 0; i < pmodel.matList.Count; i++)
+                    for (int i = 0; i < pmodel.materials.Count; i++)
                     {
-                        var pmat = pmodel.matList[i];
+                        var pmat = pmodel.materials[i];
 
                         sb.Append("\n\tMaterial: " + (40000 + i) + ", \"Material::" + pmat.name + "\", \"\" {");
                         sb.Append("\n\t\tVersion: 102");
@@ -424,9 +424,9 @@ namespace PIG2FBX
                         }
                     }
 
-                    for (int i = 0; i < pmodel.texList.Count; i++)
+                    for (int i = 0; i < pmodel.textures.Count; i++)
                     {
-                        var texture = pmodel.texList[i];
+                        var texture = pmodel.textures[i];
                         var relativeFname = MakeRelative(texture.filename, PIGfile);
 
                         sb.Append("\n\tTexture: " + (50000 + i) + ", \"Texture::" + texture.name + "\", \"\" {");
